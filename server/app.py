@@ -18,6 +18,46 @@ db.init_app(app)
 
 api = Api(app)
 
+class Login(Resource):
+    def post(self):
+        # 1. Extract username from JSON request body
+        data = request.get_json()
+        username = data.get('username')
+        
+        # 2. Query database for user
+        user = User.query.filter_by(username=username).first()
+        
+        if user:
+            # 3. Save user_id to session and return user info
+            session['user_id'] = user.id
+            return make_response(jsonify(UserSchema().dump(user)), 200)
+            
+        return make_response(jsonify({'error': 'Unauthorized'}), 401)
+
+
+class Logout(Resource):
+    def delete(self):
+        # 1. Clear out the authenticated user's ID
+        session.pop('user_id', None)
+        
+        # 2. Return an empty body with a 204 No Content status
+        return make_response('', 204)
+
+
+class CheckSession(Resource):
+    def get(self):
+        # 1. Identify user using current active session cookie
+        user_id = session.get('user_id')
+        
+        if user_id:
+            user = User.query.filter_by(id=user_id).first()
+            if user:
+                return make_response(jsonify(UserSchema().dump(user)), 200)
+                
+        # 2. Return 401 if nobody is currently validated
+        return make_response(jsonify({'error': 'Unauthorized'}), 401)
+
+
 class ClearSession(Resource):
 
     def delete(self):
@@ -51,6 +91,11 @@ class ShowArticle(Resource):
 api.add_resource(ClearSession, '/clear')
 api.add_resource(IndexArticle, '/articles')
 api.add_resource(ShowArticle, '/articles/<int:id>')
+
+api.add_resource(Login, '/login')
+api.add_resource(Logout, '/logout')
+api.add_resource(CheckSession, '/check_session')
+
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
