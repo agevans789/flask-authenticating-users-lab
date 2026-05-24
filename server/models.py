@@ -1,53 +1,32 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData
-from marshmallow import Schema, fields
+from sqlalchemy_serializer import SerializerMixin
 
-metadata = MetaData(naming_convention={
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-})
+db = SQLAlchemy()
 
-db = SQLAlchemy(metadata=metadata)
-
-class Article(db.Model):
-    __tablename__ = 'articles'
-
-    id = db.Column(db.Integer, primary_key=True)
-    author = db.Column(db.String)
-    title = db.Column(db.String)
-    content = db.Column(db.String)
-    preview = db.Column(db.String)
-    minutes_to_read = db.Column(db.Integer)
-    date = db.Column(db.DateTime, server_default=db.func.now())
-
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-
-    def __repr__(self):
-        return f'Article {self.id} by {self.author}'
-
-class User(db.Model):
+class User(db.Model, SerializerMixin):
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String, unique=True)
+    username = db.Column(db.String, unique=True, nullable=False)
 
-    articles = db.relationship('Article', backref='user')
+    # Establish clean relationships
+    articles = db.relationship('Article', back_populates='user', cascade='all, delete-orphan')
+    
+    # Simple serialization rule preventing recursion loops
+    serialize_rules = ('-articles.user',)
 
-    def __repr__(self):
-        return f'User {self.username}, ID {self.id}'
 
-class UserSchema(Schema):
-    id = fields.Int()
-    username = fields.String()
+class Article(db.Model, SerializerMixin):
+    __tablename__ = 'articles'
 
-    articles = fields.List(fields.Nested(lambda: ArticlesSchema(exclude=("user",))))
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String, nullable=False)
+    content = db.Column(db.String, nullable=False)
+    preview = db.Column(db.String)
+    minutes_to_read = db.Column(db.Integer)
+    
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
-class ArticlesSchema(Schema):
-    id = fields.Int()
-    author = fields.String()
-    title = fields.String()
-    content = fields.String()
-    preview = fields.String()
-    minutes_to_read = fields.Int()
-    date = fields.DateTime()
+    user = db.relationship('User', back_populates='articles')
+    serialize_rules = ('-user.articles',)
 
-    user = fields.Nested(UserSchema(exclude=("articles",)))

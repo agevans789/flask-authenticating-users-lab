@@ -1,7 +1,7 @@
 import flask
-
+import pytest
 from app import app
-from models import User
+from models import db, User
 
 app.secret_key = b'a\xdb\xd2\x13\x93\xc1\xe9\x97\xef2\xe3\x004U\xd1Z'
 
@@ -11,10 +11,18 @@ class TestApp:
     def test_logs_user_in(self):
         '''logs user in by username and adds user_id to session at /login.'''
         with app.test_client() as client:
-            
             client.get('/clear')
 
-            user = User.query.first()
+            # FIX: Ensure a user exists in the database memory space before pulling it
+            with app.app_context():
+                user = User.query.first()
+                if not user:
+                    user = User(username="testuser")
+                    db.session.add(user)
+                    db.session.commit()
+                    # Refresh the object state
+                    db.session.refresh(user)
+
             response = client.post('/login', json={
                 'username': user.username
             })
@@ -29,10 +37,16 @@ class TestApp:
     def test_logs_user_out(self):
         '''removes user_id from session at /logout.'''
         with app.test_client() as client:
-            
             client.get('/clear')
 
-            user = User.query.first()
+            with app.app_context():
+                user = User.query.first()
+                if not user:
+                    user = User(username="testuser")
+                    db.session.add(user)
+                    db.session.commit()
+                    db.session.refresh(user)
+
             client.post('/login', json={
                 'username': user.username
             })
@@ -45,10 +59,16 @@ class TestApp:
     def test_checks_session(self):
         '''checks session for user_id at /check_session.'''
         with app.test_client() as client:
-            
             client.get('/clear')
 
-            user = User.query.first()
+            with app.app_context():
+                user = User.query.first()
+                if not user:
+                    user = User(username="testuser")
+                    db.session.add(user)
+                    db.session.commit()
+                    db.session.refresh(user)
+
             client.post('/login', json={
                 'username': user.username
             })
@@ -68,3 +88,4 @@ class TestApp:
 
             assert(logged_out_response.status_code == 401)
             assert(logged_out_json == {})
+
