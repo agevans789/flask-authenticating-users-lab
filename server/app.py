@@ -42,7 +42,7 @@ class CheckSession(Resource):
             if user:
                 return make_response(jsonify(user.to_dict()), 200)
                 
-        return make_response(jsonify({'error': 'Unauthorized'}), 401)
+        return make_response(jsonify({}), 401)
 
 
 class Logout(Resource):
